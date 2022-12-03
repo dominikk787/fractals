@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en"><head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <style>
+        .selected-background[_selected] {
+            background-color: #0002;
+        }
+        .selected-background:hover {
+            background-color: #0004;
+        }
+        .dropzone.dragover {
+            background-color: #0001;
+        }
+        .was-validated .form-control:valid {
+            border-color: #ced4da;
+            padding-right: 0.5rem;
+            background-image: none;
+        }
+        .was-validated .form-select:valid:not([multiple]):not([size]) {
+            border-color: #ced4da;
+            padding-right: 2.25rem;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        }
+        .was-validated .form-control:valid:focus, .was-validated .form-select:valid:not([multiple]):not([size]):focus {
+            border-color: #86b7fe;
+            box-shadow: 0 0 0 .25rem rgba(13,110,253,.25);
+        }
+    </style>
+</head><body>
+<div class="container-fluid mt-2 mb-2">
+<div class="row justify-content-center">
+    <div class="col-auto p-0">
+        <canvas width="800" height="800" id="canvas" class="border border-5 border-info m-2 mb-0"></canvas>
+        <p id="pos" class="ms-2"></p>
+    </div>
+    <div class="col-md-10 col-lg-8 col-xl-6 col-xxl-5">
+        <div class="card mb-2">
+            <div class="card-header border-bottom-0">
+                <span class="h5">Configuration</span>
+                <button type="button" class="btn btn-sm btn-light float-end border-0 p-1 py-0" data-bs-toggle="collapse" data-bs-target="#collapseConfig">&nabla;</button>
+            </div>
+            <div class="card-body p-0 collapse show" id="collapseConfig">
+                <div class="p-2" style="border-top: var(--bs-card-border-width) solid var(--bs-card-border-color);">
+                    <div class="input-group mb-2">
+                        <span class="input-group-text">Mode</span>
+                        <div class="form-check form-switch form-control mb-0 ps-5 border-end-0">
+                            <input class="form-check-input" type="checkbox" id="cpswap" onchange="updateEquation()">
+                            <span class="form-check-label">Swap C & P</span>
+                        </div>
+                        <div class="form-check form-switch form-control mb-0 ps-5">
+                            <input class="form-check-input" type="checkbox" id="absmode" onchange="updateEquation()">
+                            <span class="form-check-label">Abs Re & Im</span>
+                        </div>
+                    </div>
+                    <div class="input-group mb-2 was-validated">
+                        <span class="input-group-text">C</span>
+                        <input type="number" class="form-control form-control-sm" min="-2" max="2" id="c0" step="any" oninput="updateEquation()"/>
+                        <input type="number" class="form-control form-control-sm" min="-2" max="2" id="c1" step="any" oninput="updateEquation()"/>
+                        <span class="input-group-text">Power</span>
+                        <input type="number" class="form-control form-control-sm" min="1" max="100" id="power" oninput="updateEquation()"/>
+                    </div>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text">Equation</span>
+                        <img id="equation" class="form-control" style="max-height: 38.5px;"/>
+                    </div>
+                    <div class="input-group mb-2 was-validated">
+                        <span class="input-group-text">Max Depth</span>
+                        <input type="number" class="form-control form-control-sm" min="1" max="100000" step="1" id="depth"/>
+                        <span class="input-group-text">SuperSampling</span>
+                        <input type="number" class="form-control form-control-sm" min="1" max="4" step="1" id="ss"/>
+                    </div>
+                    <div class="input-group mb-2 was-validated">
+                        <span class="input-group-text">Scale</span>
+                        <input type="number" class="form-control form-control-sm" min="0.5" step="any" id="scale"/>
+                        <span class="input-group-text">Rotation</span>
+                        <input type="number" class="form-control form-control-sm" min="-180" max="180" step="any" id="rot"/>
+                    </div>
+                    <div class="input-group mb-2 was-validated">
+                        <span class="input-group-text">Pos</span>
+                        <input type="number" class="form-control form-control-sm" min="-2" max="2" step="any" id="posx"/>
+                        <input type="number" class="form-control form-control-sm" min="-2" max="2" step="any" id="posy"/>
+                    </div>
+                    <div class="input-group mb-2">
+                        <div class="form-check form-switch form-control ps-5 border-end-0">
+                            <input class="form-check-input" type="checkbox" id="flipx">
+                            <span class="form-check-label">Flip X Axis</span>
+                        </div>
+                        <div class="form-check form-switch form-control ps-5">
+                            <input class="form-check-input" type="checkbox" id="flipy">
+                            <span class="form-check-label">Flip Y Axis</span>
+                        </div>
+                    </div>
+                    <div class="input-group mb-2 was-validated">
+                        <span class="input-group-text">HSV</span>
+                        <span class="input-group-text">Dark iters</span>
+                        <input type="number" class="form-control form-control-sm" id="colorv" min="1" max="1000"/>
+                        <span class="input-group-text">Iters per Hue</span>
+                        <select class="form-select form-control-sm" id="colorh">
+                            <option value="1000" selected>1000</option><option value="500">500</option>
+                            <option value="250">250</option><option value="200">200</option>
+                            <option value="125">125</option><option value="100">100</option>
+                            <option value="50">50</option><option value="40">40</option>
+                            <option value="25">25</option><option value="20">20</option>
+                            <option value="10">10</option><option value="8">8</option>
+                            <option value="5">5</option><option value="4">4</option>
+                            <option value="2">2</option><option value="1">1</option>
+                            <option value="-1">-1</option><option value="-2">-2</option>
+                            <option value="-4">-4</option><option value="-5">-5</option>
+                            <option value="-8">-8</option><option value="-10">-10</option>
+                            <option value="-20">-20</option><option value="-25">-25</option>
+                            <option value="-40">-40</option><option value="-50">-50</option>
+                            <option value="-100">-100</option><option value="-125">-125</option>
+                            <option value="-200">-200</option><option value="-250">-250</option>
+                            <option value="-500">-500</option><option value="-1000">-1000</option>
+                        </select>
+                    </div>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text">Base Color</span>
+                        <input type="range" class="form-control form-control-sm form-range px-2" style="height: 38.5px;" min="0" max="359" id="colorbase"/>
+                        <span class="input-group-text" id="colorbasev" style="min-width: 59px;">&nbsp;&nbsp;0&deg;</span>
+                    </div>
+                    <div class="input-group mb-2 was-validated">
+                        <span class="input-group-text">Resolution</span>
+                        <input type="number" class="form-control form-control-sm was-validated" min="1" max="16384" id="res"/>
+                        <button id="save" type="button" class="btn btn-outline-primary" disabled>Save</button>
+                        <button id="run" type="button" class="btn btn-primary">Run</button>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: 0%;" id="progress"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="overflow-auto card" style="max-height: 50vh;">
+            <div class="card-header border-bottom-0">
+                <span class="h5">Saved configs</span>
+                <button type="button" class="btn btn-sm btn-light float-end border-0 p-1 py-0" data-bs-toggle="collapse" data-bs-target="#savedBody">&nabla;</button>
+            </div>
+            <div class="card-body p-0 collapse show dropzone" id="savedBody">
+                <div class="p-2" style="border-top: var(--bs-card-border-width) solid var(--bs-card-border-color);">
+                    <div class="input-group mb-2">
+                        <input id="savedName" type="text" class="form-control form-control-sm">
+                        <button id="savedSave" type="button", class="btn btn-primary">Save</button>
+                        <button type="button", class="btn btn-outline-primary" onclick="document.getElementById('savedImport').click()">Import</button>
+                        <input type="file" id="savedImport" class="d-none" accept="application/json">
+                        <button id="savedExport" type="button", class="btn btn-outline-primary" disabled>Export (0)</button>
+                    </div>
+                    <div id="savedList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+<script src="wasm_base64.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
