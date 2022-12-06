@@ -1,4 +1,6 @@
+const cpuCount = navigator.hardwareConcurrency * (navigator.hardwareConcurrency >= 4 ? 1 : 2);
 const $ = idstr => document.getElementById(idstr);
+const Sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const getNumber = el => Number($(el).value);
 const getChecked = el => $(el).checked;
@@ -90,8 +92,28 @@ const colorbaseOnChange = () => {
     $('colorbase').addEventListener(v, colorbaseOnChange));
 
 async function run() {
-    const wasm = await WebAssembly.instantiateStreaming(fetch(wasmURL), {}).then(mod => mod.instance.exports);
+    const wasm = await WebAssembly.instantiateStreaming(fetch('fractal.wasm'), {}).then(mod => mod.instance.exports);
     wasm._initialize();
+
+    const workers = [], workerJobs = [];
+    let lastWorker = 0;
+    function workerOnMsg(e, i) {
+        if(Array.isArray(e.data)) {
+            if(e.data.length == 2) {
+                const y = e.data[0];
+                const data = new Uint8ClampedArray(e.data[1]);
+                const imgdata = new ImageData(data, data.length / 4, 1);
+                ctx.putImageData(imgdata, 0, y);
+                workerJobs[i]--;
+            }
+        }
+    }
+
+    for(let i = 0; i < cpuCount; i++) {
+        workers.push(new Worker('worker.js'));
+        workerJobs.push(0);
+        workers[i].onmessage = (e) => workerOnMsg(e, i);
+    }
 
     function wasmStack(stackSize, callback) {
         const stack = wasm.stackSave(),
@@ -105,18 +127,18 @@ async function run() {
             wasm.getCorners(off);
             return Array.from(new Float64Array(buf, off, 4));
         });
-    const drawLine = (y, ctx) =>
-        wasmStack(wasm.getPitch(), (buf, off, pitch) => {
-            wasm.renderLine(off, y);
-            const data = new Uint8ClampedArray(buf, off, pitch);
-            const imgdata = new ImageData(data, pitch / 4, 1);
-            ctx.putImageData(imgdata, 0, y);
-        });
+    async function drawLine(y) {
+        lastWorker++;
+        if(lastWorker >= cpuCount) lastWorker = 0;
+        while(workerJobs[lastWorker] > 4) await Sleep(5);
+        workers[lastWorker].postMessage(y);
+        workerJobs[lastWorker]++;
+    }
 
     let status = 0;
-    function drawLines(line, n) {
+    async function drawLines(line, n) {
         if(status === 1) {
-            for (let y = line; y < size && y < line + n; y++) drawLine(y, ctx);
+            for (let y = line; y < size && y < line + n; y++) await drawLine(y);
             line = Math.min(line + n, size);
             const lstr = (line / size * 100).toFixed(0);
             if (line === 0) progress.style.transition = 'width 100ms ease';
@@ -153,6 +175,12 @@ async function run() {
             ctx.clearRect(0, 0, size, size);
             progress.style.transition = 'width 0s ease';
             progress.style.width = '0%';
+            const state = wasmStack(104, (buf, off, pitch) => {
+                wasm.saveState(off);
+                const data = new Uint8ClampedArray(buf, off, pitch);
+                return [...data];
+            });
+            for(let i = 0; i < cpuCount; i++) workers[i].postMessage(state);
             setTimeout(drawLines, 0, 0, Math.ceil(size / 100));
         } else if (status > 0) status = 2;
     });

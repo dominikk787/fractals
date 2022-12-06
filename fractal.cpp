@@ -62,16 +62,21 @@ void hv2rgb(float h, float v, RGBf *res) {
     else *res = {0, 0, 0};
 }
 
-uint32_t size;
-Complex R, S, C, pos;
-uint32_t maxiters, ss, power;
-bool cpswap, absmode;
+struct conf_t {
+    uint32_t size;
+    Complex R, S, C, pos;
+    uint32_t maxiters, ss, power;
+    bool cpswap, absmode;
+    int32_t chdiv;
+    uint32_t cvdiv;
+    float cbase;
+} conf;
 RGBf colors[2001];
 
 RGBf iter(Complex _p, Complex c, bool absmode, uint32_t pow) {
     Complex p = _p;
     uint32_t j = 2000;
-    for(uint32_t i = 0; i < maxiters; i++) {
+    for(uint32_t i = 0; i < conf.maxiters; i++) {
         if((p.r*p.r + p.i*p.i) > 4) {
             if(i <= 1000) j = i;
             else j = (i % 1000) + 1000;
@@ -83,56 +88,68 @@ RGBf iter(Complex _p, Complex c, bool absmode, uint32_t pow) {
     };
     return colors[j];
 }
-
-EXPORTED void initColors(int32_t hdiv, uint32_t vdiv, float base) {
+void colorsCalc() {
     for(uint32_t i = 0; i < 2000; i++) {
-        float h = i / (float)hdiv + base;
-        float v = (i < vdiv) ? (i / (float)vdiv) : 1.f;
+        float h = i / (float)conf.chdiv + conf.cbase;
+        float v = (i < conf.cvdiv) ? (i / (float)conf.cvdiv) : 1.f;
         hv2rgb(h, v, &colors[i]);
     }
     colors[2000] = {1, 1, 1};
 }
+EXPORTED void initColors(int32_t hdiv, uint32_t vdiv, float base, bool calc) {
+    conf.chdiv = hdiv;
+    conf.cvdiv = vdiv;
+    conf.cbase = base;
+    colorsCalc();
+}
 EXPORTED void setCanvasSize(uint32_t _size) {
-    size = _size;
+    conf.size = _size;
 }
 EXPORTED void setConf(double _r0, double _r1, double _sx, double _sy, double _c0, double _c1, uint32_t _maxiters, uint32_t _ss) {
-    R = {_r0, _r1};
-    S = {_sx, _sy};
-    C = {_c0, _c1};
-    maxiters = _maxiters;
-    ss = _ss;
+    conf.R = {_r0, _r1};
+    conf.S = {_sx, _sy};
+    conf.C = {_c0, _c1};
+    conf.maxiters = _maxiters;
+    conf.ss = _ss;
 }
 EXPORTED void setPos(double _posx, double _posy) {
-    pos = {_posx, _posy};
+    conf.pos = {_posx, _posy};
 }
 EXPORTED void setMode(bool _cpswap, bool _absmode, uint32_t _pow) {
-    cpswap = _cpswap;
-    absmode = _absmode;
-    power = _pow;
+    conf.cpswap = _cpswap;
+    conf.absmode = _absmode;
+    conf.power = _pow;
 }
 EXPORTED void getCorners(double *res) {
-    double sizemul = 2.0/size;
-    double rb = (size-1)*sizemul - 1.0;
-    res[0] = -S.x + pos.x; res[1] = rb*S.x + pos.x;
-    res[2] = -S.y + pos.y; res[3] = rb*S.y + pos.y;
+    double sizemul = 2.0/conf.size;
+    double rb = (conf.size-1)*sizemul - 1.0;
+    res[0] = -conf.S.x + conf.pos.x; res[1] = rb*conf.S.x + conf.pos.x;
+    res[2] = -conf.S.y + conf.pos.y; res[3] = rb*conf.S.y + conf.pos.y;
 }
 EXPORTED uint32_t getPitch() {
-    return sizeof(RGBA) * size;
+    return sizeof(RGBA) * conf.size;
 }
 EXPORTED void renderLine(RGBA *line, uint32_t y) {
-    double sizemul = 2.0/size, yf = y;
-    for(uint32_t x = 0; x < size; x++) {
+    double sizemul = 2.0/conf.size, yf = y;
+    for(uint32_t x = 0; x < conf.size; x++) {
         double xf = x;
         RGBf c = {0, 0, 0};
-        for(uint32_t yss = 0; yss < ss; yss++) {
-            double posy = (((yf + (yss / (double)ss))*sizemul - 1.0) * S.y) + pos.y;
-            for(uint32_t xss = 0; xss < ss; xss++) {
-                Complex p = (Complex){(((xf + (xss / (double)ss))*sizemul - 1.0) * S.x) + pos.x, posy}*R, tmpc = C;
-                if(cpswap) { std::swap(p, tmpc); }
-                RGBf c0 = iter(p, tmpc, absmode, power);
+        for(uint32_t yss = 0; yss < conf.ss; yss++) {
+            double posy = (((yf + (yss / (double)conf.ss))*sizemul - 1.0) * conf.S.y) + conf.pos.y;
+            for(uint32_t xss = 0; xss < conf.ss; xss++) {
+                Complex p = (Complex){(((xf + (xss / (double)conf.ss))*sizemul - 1.0) * conf.S.x) + conf.pos.x, posy}*conf.R, tmpc = conf.C;
+                if(conf.cpswap) { std::swap(p, tmpc); }
+                RGBf c0 = iter(p, tmpc, conf.absmode, conf.power);
                 c += c0;
             }
         }
-        line[x] = c.toRGBA(255.f/(ss*ss));
+        line[x] = c.toRGBA(255.f/(conf.ss*conf.ss));
     }
+}
+EXPORTED void saveState(void *buf) {
+    memcpy(buf, &conf, sizeof(conf));
+}
+EXPORTED void loadState(const void *buf) {
+    memcpy(&conf, buf, sizeof(conf));
+    colorsCalc();
 }
