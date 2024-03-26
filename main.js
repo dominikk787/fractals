@@ -6,20 +6,24 @@ const getNumber = el => Number($(el).value);
 const getChecked = el => $(el).checked;
 
 function updateEquation() {
-    const swap = getChecked('cpswap'), abs = getChecked('absmode');
+    const mode = getNumber('mode')
+    const swap = (mode & 1) == 1, abs = (mode & 2) == 2, newton = mode == 4
     const r = getNumber('c0'), i = getNumber('c1'), pow = getNumber('power');
-    const eqabs = '(|\\operatorname {Re}\\left(z_{n}\\right)|+i|\\operatorname {Im}\\left(z_{n}\\right)|)',
-        Cstr = '\\small(%r+%ii)\\normalsize';
-    let eq = 'z_{{n+1}}=%0^{%p}+%2,\\quad z_{0}=%1'.replace('%0', abs ? eqabs : 'z_{n}');
-    eq = eq.replace('%1', swap ? Cstr : 'p').replace('%2', swap ? 'p' : Cstr);
+    let eq = ''
+    if(!newton) {
+        const eqabs = '(|\\operatorname {Re}\\left(z_{n}\\right)|+i|\\operatorname {Im}\\left(z_{n}\\right)|)',
+            Cstr = '\\small(%r+%ii)\\normalsize';
+        eq = 'z_{{n+1}}=%0^{%p}+%2,\\quad z_{0}=%1'.replace('%0', abs ? eqabs : 'z_{n}');
+        eq = eq.replace('%1', swap ? Cstr : 'p').replace('%2', swap ? 'p' : Cstr);
+    } else eq = 'z_{{n+1}}=z_{n}-f(z)/f\'(z),\\quad z_{0}=p,\\quad f(z)=z^{%p}-\\small(%r+%ii)\\normalsize'
     eq = eq.replace('%r', r.toString()).replace('%i', i.toString()).replace('%p', pow.toString());
     const eqstr = encodeURIComponent(eq);
     $('equation').src = 'https://math.vercel.app/?from=' + eqstr + '.svg';
 }
 updateEquation();
 
-const inBool = ['cpswap', 'absmode', 'flipx', 'flipy'];
-const inNum = ['c0', 'c1', 'power', 'depth', 'ss', 'scale', 'rot', 'posx', 'posy', 'colorv', 'colorh', 'colorbase', 'res'];
+const inBool = ['flipx', 'flipy', 'light'];
+const inNum = ['mode', 'c0', 'c1', 'power', 'depth', 'ss', 'scale', 'rot', 'posx', 'posy', 'colorv', 'colorh', 'colorbase', 'res'];
 const inEl = [...inBool, ...inNum];
 
 function getConfigObj() {
@@ -43,7 +47,7 @@ function loadConfigObj(obj) {
 }
 
 function download(url, name) {
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.setAttribute('download', name);
     link.href = url;
     document.body.appendChild(link);
@@ -58,7 +62,7 @@ const canvas = $('canvas'),
     ctx = canvas.getContext('2d');
 let size = 0, corners = [0, 0, 0, 0], scale = 0;
 
-btnsave.addEventListener('click', _ => download(canvas.toDataURL("image/webp", 1), 'fraktal.webp'));
+btnsave.addEventListener('click', _ => download(canvas.toDataURL('image/webp', 1), 'fraktal.webp'));
 
 function canvasPosHandler(e) {
     const ox = e.offsetX, oy = e.offsetY, type = e.type;
@@ -68,7 +72,10 @@ function canvasPosHandler(e) {
     const y = oy / (size - 1) * (corners[3] - corners[2]) + corners[2];
     const digits = 4 - Math.round(Math.log10(scale));
     const xstr = x.toFixed(digits), ystr = y.toFixed(digits);
-    if (type === 'mousemove') $('pos').innerText = xstr + ' x ' + ystr;
+    // const c = ctx.getImageData(ox, oy, 1, 1).data
+    if (type === 'mousemove')
+        $('pos').innerText = xstr + ' x ' + ystr // + ' RGB(' + (c[0]/255).toFixed(3) + ', ' +
+        //(c[1]/255).toFixed(3) + ', ' + (c[2]/255).toFixed(3) + ')';
     else {
         $('posx').value = xstr;
         $('posy').value = ystr;
@@ -76,7 +83,7 @@ function canvasPosHandler(e) {
 }
 ['mousemove', 'dblclick'].forEach(v => canvas.addEventListener(v, canvasPosHandler));
 const clickIfEnter = (e, el) => {
-    if(e.key === "Enter") {
+    if(e.key === 'Enter') {
         e.preventDefault();
         el.click();
     }
@@ -150,21 +157,22 @@ async function run() {
             }
             btnsave.removeAttribute('disabled');
         }
-        btnrun.innerText = "Run";
+        btnrun.innerText = 'Run';
         status = 0;
     }
 
     btnrun.addEventListener('click', e => {
         if (status === 0) {
             status = 1;
-            btnrun.innerText = "Stop";
+            btnrun.innerText = 'Stop';
             btnsave.setAttribute('disabled', '');
             size = getNumber('res');
             canvas.width = canvas.height = size;
             const rot = getNumber('rot') * (Math.PI / 180);
             scale = 1 / getNumber('scale');
-            wasm.setMode(getChecked('cpswap'), getChecked('absmode'), getNumber('power'));
-            wasm.initColors(getNumber('colorh'), getNumber('colorv'), getNumber('colorbase')/360);
+            const mode = getNumber('mode')
+            wasm.setMode((mode & 1) == 1, (mode & 2) == 2, mode == 4, getNumber('power'));
+            wasm.initColors(getNumber('colorh'), getNumber('colorv'), getNumber('colorbase')/360, getChecked('light'));
             wasm.setCanvasSize(size);
             wasm.setConf(Math.cos(rot), Math.sin(rot),
                 scale * (getChecked('flipx') ? -1 : 1),
@@ -328,10 +336,11 @@ function saved() {
         // if(1) {
         if(!storage.getItem(itemName) || storage.getItem(itemName).indexOf('{') === -1) {
             const savedTmp = [
-                {"name": "Napkin? fractal", "cpswap":false,"absmode":true,"flipx":false,"flipy":false,"c0":0.1,"c1":-1.18,"power":2,"depth":500,"ss":2,"scale":0.6,"rot":0,"posx":0,"posy":0,"colorv":40,"colorh":500,"colorbase":0,"res":800},
-                {"name": "Burning Ship fractal", "cpswap":true,"absmode":true,"flipx":false,"flipy":false,"c0":0,"c1":0,"power":2,"depth":500,"ss":1,"scale":0.6,"rot":0,"posx":-0.4,"posy":-0.2,"colorv":25,"colorh":1000,"colorbase":0,"res":800},
-                {"name": "Mandelbrot set", "cpswap":true,"absmode":false,"flipx":false,"flipy":false,"c0":0,"c1":0,"power":2,"depth":500,"ss":1,"scale":0.8,"rot":0,"posx":-0.6,"posy":0,"colorv":20,"colorh":1000,"colorbase":0,"res":800},
-                {"name": "Julia set example", "cpswap":false,"absmode":false,"flipx":false,"flipy":true,"c0":-0.757,"c1":0.06065,"power":2,"depth":5000,"ss":2,"scale":0.90909,"rot":45,"posx":0,"posy":0,"colorv":1000,"colorh":1000,"colorbase":0,"res":800}
+                {'name': 'Napkin? fractal', 'mode':2,'flipx':false,'flipy':false,'c0':0.1,'c1':-1.18,'power':2,'depth':500,'ss':2,'scale':0.6,'rot':0,'posx':0,'posy':0,'light':false,'colorv':40,'colorh':500,'colorbase':0,'res':800},
+                {'name': 'Burning Ship fractal', 'mode':3,'flipx':false,'flipy':false,'c0':0,'c1':0,'power':2,'depth':500,'ss':1,'scale':0.6,'rot':0,'posx':-0.4,'posy':-0.2,'light':false,'colorv':25,'colorh':1000,'colorbase':0,'res':800},
+                {'name': 'Mandelbrot set', 'mode':1,'flipx':false,'flipy':false,'c0':0,'c1':0,'power':2,'depth':500,'ss':1,'scale':0.8,'rot':0,'posx':-0.6,'posy':0,'light':false,'colorv':20,'colorh':1000,'colorbase':0,'res':800},
+                {'name': 'Julia set example', 'mode':0,'flipx':false,'flipy':true,'c0':-0.757,'c1':0.06065,'power':2,'depth':5000,'ss':2,'scale':0.90909,'rot':45,'posx':0,'posy':0,'light':false,'colorv':1000,'colorh':1000,'colorbase':0,'res':800},
+                {'name': 'Newton Fractal', 'mode':4,'flipx':false,'flipy':false,'c0':1,'c1':0,'power':3,'depth':500,'ss':2,'scale':0.6,'rot':0,'posx':0,'posy':0,'light':true,'colorv':20,'colorh':1000,'colorbase':0,'res':800}
             ];
             storage.setItem(itemName, JSON.stringify(savedTmp));
         }

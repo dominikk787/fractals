@@ -28,10 +28,10 @@
         }
     </style>
 </head><body>
-<div class="container-fluid mt-2 mb-2">
+<div class="container-fluid mt-4 mb-4">
 <div class="row justify-content-center">
     <div class="col-auto p-0">
-        <canvas width="800" height="800" id="canvas" class="border border-5 border-info m-2 mb-0"></canvas>
+        <canvas width="800" height="800" id="canvas" class="border border-5 border-info ms-2 me-2"></canvas>
         <p id="pos" class="ms-2"></p>
     </div>
     <div class="col-md-10 col-lg-8 col-xl-6 col-xxl-5">
@@ -44,14 +44,13 @@
                 <div class="p-2" style="border-top: var(--bs-card-border-width) solid var(--bs-card-border-color);">
                     <div class="input-group mb-2">
                         <span class="input-group-text">Mode</span>
-                        <div class="form-check form-switch form-control mb-0 ps-5 border-end-0">
-                            <input class="form-check-input" type="checkbox" id="cpswap" onchange="updateEquation()">
-                            <span class="form-check-label">Swap C & P</span>
-                        </div>
-                        <div class="form-check form-switch form-control mb-0 ps-5">
-                            <input class="form-check-input" type="checkbox" id="absmode" onchange="updateEquation()">
-                            <span class="form-check-label">Abs Re & Im</span>
-                        </div>
+                        <select class="form-select form-select-md" id="mode" onchange="updateEquation()">
+                            <option value="4">Newton Fractal</option>
+                            <option value="0">Julia Set</option>
+                            <option value="1">Mandelbrot Set</option>
+                            <option value="3">Burning Ship</option>
+                            <option value="2">Napkin Fractal</option>
+                        </select>
                     </div>
                     <div class="input-group mb-2 was-validated">
                         <span class="input-group-text">C</span>
@@ -72,7 +71,7 @@
                     </div>
                     <div class="input-group mb-2 was-validated">
                         <span class="input-group-text">Scale</span>
-                        <input type="number" class="form-control form-control-sm" min="0.5" step="any" id="scale"/>
+                        <input type="number" class="form-control form-control-sm" min="0.1" step="any" id="scale"/>
                         <span class="input-group-text">Rotation</span>
                         <input type="number" class="form-control form-control-sm" min="-180" max="180" step="any" id="rot"/>
                     </div>
@@ -89,6 +88,10 @@
                         <div class="form-check form-switch form-control ps-5">
                             <input class="form-check-input" type="checkbox" id="flipy">
                             <span class="form-check-label">Flip Y Axis</span>
+                        </div>
+                        <div class="form-check form-switch form-control ps-5">
+                            <input class="form-check-input" type="checkbox" id="light">
+                            <span class="form-check-label">Light Colors</span>
                         </div>
                     </div>
                     <div class="input-group mb-2 was-validated">
